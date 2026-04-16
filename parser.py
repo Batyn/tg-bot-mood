@@ -23,11 +23,17 @@ _PERIOD_BEFORE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# "с 11 до 16", "с 9:30 до 18:00"  — диапазон времени
+_RANGE_RE = re.compile(
+    r"с\s+(\d{1,2})(?::(\d{2}))?\s+до\s+(\d{1,2})(?::(\d{2}))?",
+    re.IGNORECASE,
+)
+
 # "11:00", "в 9:30"  — просто HH:MM без слова периода
 _TIME_RE = re.compile(r"(?:в\s+)?(\d{1,2}):(\d{2})", re.IGNORECASE)
 
-# Оценка: +5, -8, +10
-_SCORE_RE = re.compile(r"([+-]\d+)")
+# Оценка: +5, -8, +10, или просто 0
+_SCORE_RE = re.compile(r"([+-]\d+|(?<![:\d])0(?!\d))")
 
 
 def _apply_period(hour: int, period: str) -> int:
@@ -52,7 +58,16 @@ def parse_time(text: str) -> tuple[dtime | None, str]:
     """
     Ищет время в тексте.
     Возвращает (time | None, текст без найденного времени).
+    Для диапазона "с X до Y" берёт время начала, диапазон остаётся в описании.
     """
+    # 0. Диапазон "с 11 до 16" — берём время начала, текст не трогаем
+    m = _RANGE_RE.search(text)
+    if m:
+        hour = int(m.group(1))
+        minute = int(m.group(2)) if m.group(2) else 0
+        if 0 <= hour <= 23 and 0 <= minute <= 59:
+            return dtime(hour, minute), text  # описание оставляем как есть
+
     # 1. Период после числа: "11 утра", "в 5 вечера", "утром" и т.д.
     m = _PERIOD_AFTER_RE.search(text)
     if m:
