@@ -35,7 +35,8 @@ def build_excel(rows: list[sqlite3.Row], total: int) -> io.BytesIO:
     # ── Данные ─────────────────────────────────────────────────
     for row_idx, row in enumerate(rows, start=2):
         created_at: str = row["created_at"]
-        date_part = created_at.split(" ")[0]
+        iso_date = created_at.split(" ")[0]
+        date_part = f"{iso_date[8:10]}.{iso_date[5:7]}.{iso_date[0:4]}"
         time_cell_value = _fmt_time_cell(created_at, row["end_time"])
 
         ws.cell(row=row_idx, column=1, value=date_part)
