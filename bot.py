@@ -167,7 +167,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"",
     ]
     for row in rows:
-        date_part = row["created_at"].split(" ")[0]
+        date_part = _fmt_date(row["created_at"].split(" ")[0])
         time_str = _fmt_time_cell(row["created_at"], row["end_time"])
         score_str = f'{_score_dot(row["score"])} "{_fmt_score(row["score"])}"'
         lines.append(f"* {date_part}, {time_str}, {row['description']} {score_str}")
@@ -224,7 +224,7 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # Текстовый список
     lines = []
     for row in rows:
-        date_part = row["created_at"].split(" ")[0]
+        date_part = _fmt_date(row["created_at"].split(" ")[0])
         time_str = _fmt_time_cell(row["created_at"], row["end_time"])
         score_str = f'{_score_dot(row["score"])} "{_fmt_score(row["score"])}"'
         lines.append(f"* {date_part}, {time_str}, {row['description']} {score_str}")
