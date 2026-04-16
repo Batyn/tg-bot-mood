@@ -225,6 +225,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "📝 Как записывать настроение:\n"
         "Просто напиши сообщение с оценкой (число со знаком + или -).\n"
+        "Шкала оценки от -10 до +10.\n"
         "Оценка может быть в любом месте текста.\n\n"
         "Примеры:\n"
         "  проснулась с мыслями о нём, +5\n"
