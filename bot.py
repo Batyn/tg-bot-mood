@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -33,6 +33,16 @@ logger = logging.getLogger(__name__)
 def _date_range_from_days(days: int) -> tuple[str, str]:
     today = date.today()
     return str(today - timedelta(days=days - 1)), str(today)
+
+
+def _parse_date(s: str) -> str:
+    """Принимает DD.MM.YYYY, возвращает YYYY-MM-DD."""
+    return datetime.strptime(s, "%d.%m.%Y").strftime("%Y-%m-%d")
+
+
+def _fmt_date(iso: str) -> str:
+    """Принимает YYYY-MM-DD, возвращает DD.MM.YYYY."""
+    return datetime.strptime(iso, "%Y-%m-%d").strftime("%d.%m.%Y")
 
 
 def _fmt_score(score: int) -> str:
@@ -73,30 +83,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    /stats 7             — последние 7 дней
-    /stats 2025-04-01 2025-04-16  — конкретный период
+    /stats                       — сегодня
+    /stats 7                     — последние 7 дней
+    /stats 01.04.2025 16.04.2025 — период
     """
     args = context.args or []
     user_id = update.effective_user.id
 
     try:
-        if len(args) == 1:
+        if len(args) == 0:
+            today = str(date.today())
+            date_from, date_to = today, today
+            period_label = "сегодня"
+        elif len(args) == 1:
             days = int(args[0])
             date_from, date_to = _date_range_from_days(days)
             period_label = f"последние {days} дн."
         elif len(args) == 2:
-            date_from, date_to = args[0], args[1]
-            # Быстрая валидация формата
-            date.fromisoformat(date_from)
-            date.fromisoformat(date_to)
-            period_label = f"{date_from} — {date_to}"
+            date_from = _parse_date(args[0])
+            date_to = _parse_date(args[1])
+            period_label = f"{args[0]} — {args[1]}"
         else:
             raise ValueError("wrong args")
     except (ValueError, IndexError):
         await update.message.reply_text(
             "Использование:\n"
+            "/stats — сегодня\n"
             "/stats 7\n"
-            "/stats 2025-04-01 2025-04-16"
+            "/stats 01.04.2025 16.04.2025"
         )
         return
 
@@ -148,10 +162,9 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             period_label = f"последние {days} дн."
             filename = f"mood_{days}d.xlsx"
         elif len(args) == 2:
-            date_from, date_to = args[0], args[1]
-            date.fromisoformat(date_from)
-            date.fromisoformat(date_to)
-            period_label = f"{date_from} — {date_to}"
+            date_from = _parse_date(args[0])
+            date_to = _parse_date(args[1])
+            period_label = f"{args[0]} — {args[1]}"
             filename = f"mood_{date_from}_{date_to}.xlsx"
         else:
             raise ValueError("wrong args")
@@ -159,7 +172,7 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         await update.message.reply_text(
             "Использование:\n"
             "/export 7\n"
-            "/export 2025-04-01 2025-04-16"
+            "/export 01.04.2025 16.04.2025"
         )
         return
 
@@ -197,12 +210,34 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("Да, удалить всё", callback_data="delete_confirm"),
-            InlineKeyboardButton("Отмена", callback_data="delete_cancel"),
-        ]
-    ])
+    """Удалить последнюю запись."""
+    user_id = update.effective_user.id
+    row = db.get_last_log(user_id)
+    if not row:
+        await update.message.reply_text("Записей нет.")
+        return
+
+    created_at = row["created_at"]
+    time_str = _fmt_time_cell(created_at, row["end_time"])
+    score_str = f'{_score_dot(row["score"])} {_fmt_score(row["score"])}'
+    preview = f"{created_at.split(' ')[0]}, {time_str}, {row['description']} {score_str}"
+
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("Да, удалить", callback_data="delete_last_confirm"),
+        InlineKeyboardButton("Отмена", callback_data="delete_cancel"),
+    ]])
+    await update.message.reply_text(
+        f"⚠️ Удалить последнюю запись?\n{preview}",
+        reply_markup=keyboard,
+    )
+
+
+async def cmd_deleteall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Удалить все записи."""
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("Да, удалить всё", callback_data="deleteall_confirm"),
+        InlineKeyboardButton("Отмена", callback_data="delete_cancel"),
+    ]])
     await update.message.reply_text(
         "⚠️ Удалить все твои записи? Это действие необратимо.",
         reply_markup=keyboard,
@@ -214,7 +249,13 @@ async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.answer()
     user_id = update.effective_user.id
 
-    if query.data == "delete_confirm":
+    if query.data == "delete_last_confirm":
+        row = db.delete_last_log(user_id)
+        if row:
+            await query.edit_message_text(f"Последняя запись удалена 🗑")
+        else:
+            await query.edit_message_text("Записей нет.")
+    elif query.data == "deleteall_confirm":
         count = db.delete_user_logs(user_id)
         await query.edit_message_text(f"Удалено записей: {count} 🗑")
     else:
@@ -241,11 +282,13 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "  11-15 работал +3\n"
         "  с 11 до 15 работал +3\n\n"
         "📊 Команды:\n"
-        "  /stats 7 — статистика за последние 7 дней\n"
-        "  /stats 2025-04-01 2025-04-16 — за период\n"
+        "  /stats — статистика за сегодня\n"
+        "  /stats 7 — за последние 7 дней\n"
+        "  /stats 01.04.2025 16.04.2025 — за период\n"
         "  /export 7 — скачать Excel за 7 дней\n"
-        "  /export 2025-04-01 2025-04-16 — Excel за период\n"
-        "  /delete — удалить все свои записи\n"
+        "  /export 01.04.2025 16.04.2025 — Excel за период\n"
+        "  /delete — удалить последнюю запись\n"
+        "  /deleteall — удалить все свои записи\n"
         "  /help — эта справка"
     )
 
@@ -262,7 +305,8 @@ def main() -> None:
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("export", cmd_export))
     app.add_handler(CommandHandler("delete", cmd_delete))
-    app.add_handler(CallbackQueryHandler(delete_callback, pattern="^delete_"))
+    app.add_handler(CommandHandler("deleteall", cmd_deleteall))
+    app.add_handler(CallbackQueryHandler(delete_callback, pattern="^delete"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("Бот запущен.")

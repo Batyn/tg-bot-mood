@@ -63,7 +63,29 @@ def insert_log(
     return row
 
 
+def get_last_log(user_id: int) -> sqlite3.Row | None:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM mood_logs WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+            (user_id,)
+        ).fetchone()
+
+
+def delete_last_log(user_id: int) -> sqlite3.Row | None:
+    """Удаляет последнюю запись пользователя. Возвращает удалённую строку или None."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM mood_logs WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+            (user_id,)
+        ).fetchone()
+        if row:
+            conn.execute("DELETE FROM mood_logs WHERE id = ?", (row["id"],))
+            conn.commit()
+    return row
+
+
 def delete_user_logs(user_id: int) -> int:
+    """Удаляет все записи пользователя. Возвращает количество удалённых строк."""
     with get_conn() as conn:
         cur = conn.execute("DELETE FROM mood_logs WHERE user_id = ?", (user_id,))
         conn.commit()
