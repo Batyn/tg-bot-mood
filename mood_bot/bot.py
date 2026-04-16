@@ -94,6 +94,32 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+async def cmd_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    if not context.args:
+        current = db.get_user_tz(user_id)
+        sign = "+" if current >= 0 else ""
+        await update.message.reply_text(
+            f"Твой часовой пояс: UTC{sign}{current}\n\n"
+            "Чтобы изменить, напиши:\n"
+            "  /timezone +3\n"
+            "  /timezone -5\n"
+            "  /timezone 0"
+        )
+        return
+    try:
+        offset_str = context.args[0].lstrip("+")
+        offset = int(offset_str)
+        if not (-12 <= offset <= 14):
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("Неверный формат. Пример: /timezone +3")
+        return
+    db.set_user_tz(user_id, offset)
+    sign = "+" if offset >= 0 else ""
+    await update.message.reply_text(f"Часовой пояс установлен: UTC{sign}{offset} ✅")
+
+
 async def cmd_mode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     current = db.get_user_mode(user_id)
@@ -442,6 +468,7 @@ def main() -> None:
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("mode", cmd_mode))
+    app.add_handler(CommandHandler("timezone", cmd_timezone))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("export", cmd_export))

@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from datetime import date, datetime, time as dtime
+from datetime import date, datetime, time as dtime, timezone, timedelta
 from pathlib import Path
 
 DB_PATH = Path(os.environ.get("DB_PATH", Path(__file__).parent / "mood.db"))
@@ -42,12 +42,13 @@ def init_db() -> None:
         # Настройки пользователя
         conn.execute("""
             CREATE TABLE IF NOT EXISTS user_settings (
-                user_id  INTEGER PRIMARY KEY,
-                mode     TEXT    NOT NULL DEFAULT 'mood'
+                user_id          INTEGER PRIMARY KEY,
+                mode             TEXT    NOT NULL DEFAULT 'mood',
+                timezone_offset  INTEGER NOT NULL DEFAULT 3
             )
         """)
         # Миграции
-        for col in ("end_time TEXT", "sent_at TEXT"):
+        for col in ("end_time TEXT", "sent_at TEXT", "timezone_offset INTEGER NOT NULL DEFAULT 3"):
             try:
                 conn.execute(f"ALTER TABLE mood_logs ADD COLUMN {col}")
             except sqlite3.OperationalError:
@@ -56,6 +57,32 @@ def init_db() -> None:
 
 
 # ── Настройки пользователя ─────────────────────────────────────────────────
+
+def get_user_tz(user_id: int) -> int:
+    """Возвращает UTC-смещение пользователя в часах (по умолчанию +3)."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT timezone_offset FROM user_settings WHERE user_id = ?", (user_id,)
+        ).fetchone()
+    return row["timezone_offset"] if row else 3
+
+
+def set_user_tz(user_id: int, offset: int) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO user_settings (user_id, timezone_offset) VALUES (?, ?) "
+            "ON CONFLICT(user_id) DO UPDATE SET timezone_offset = excluded.timezone_offset",
+            (user_id, offset),
+        )
+        conn.commit()
+
+
+def now_for_user(user_id: int) -> str:
+    """Текущее время в часовом поясе пользователя."""
+    offset = get_user_tz(user_id)
+    tz = timezone(timedelta(hours=offset))
+    return datetime.now(tz=tz).strftime("%Y-%m-%d %H:%M:%S")
+
 
 def get_user_mode(user_id: int) -> str:
     with get_conn() as conn:
@@ -84,9 +111,9 @@ def insert_log(
     start_time: dtime | None = None,
     end_time: dtime | None = None,
 ) -> sqlite3.Row:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_for_user(user_id)
     created_at = (
-        f"{date.today().isoformat()} {start_time.strftime('%H:%M:%S')}"
+        f"{now[:10]} {start_time.strftime('%H:%M:%S')}"
         if start_time else now
     )
     end_time_str = end_time.strftime("%H:%M:%S") if end_time else None
@@ -174,7 +201,7 @@ def insert_abc_log(
     feelings: str,
     comment: str | None = None,
 ) -> sqlite3.Row:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_for_user(user_id)
     with get_conn() as conn:
         conn.execute(
             "INSERT INTO abc_logs (user_id, sent_at, situation, thoughts, feelings, comment) "
