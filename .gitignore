@@ -1,0 +1,4 @@
+.env
+mood.db
+__pycache__/
+*.pyc
