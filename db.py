@@ -117,7 +117,7 @@ def fetch_rows(user_id: int, date_from: str, date_to: str) -> list[sqlite3.Row]:
         WHERE user_id = ?
           AND created_at >= ?
           AND created_at <= ?
-        ORDER BY created_at
+        ORDER BY created_at ASC, id ASC
     """
     with get_conn() as conn:
         rows = conn.execute(
