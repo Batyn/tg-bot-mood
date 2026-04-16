@@ -105,10 +105,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     row = db.insert_log(user_id, score, description, start_time, end_time)
 
     created_at: str = row["created_at"]
+    date_fmt = _fmt_date(created_at.split(" ")[0])
     time_display = _fmt_time_cell(created_at, row["end_time"])
     time_note = " (время из сообщения)" if start_time is not None else ""
     await update.message.reply_text(
-        f"Записала ✅  {created_at.split(' ')[0]} {time_display}{time_note}  {_score_dot(score)} {_fmt_score(score)}  {description}"
+        f"✅  {date_fmt} {time_display}{time_note}  {_score_dot(score)} {_fmt_score(score)}  {description}"
     )
 
 
