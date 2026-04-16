@@ -225,7 +225,7 @@ async def mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
     elif query.data == "set_mode_abc":
         db.set_user_mode(user_id, "abc")
-        await query.edit_message_text("Режим: 📋 КПТ ABC")
+        await query.message.delete()
         await _send_abc_info(query.message)
 
 
