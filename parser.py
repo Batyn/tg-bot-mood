@@ -60,13 +60,13 @@ def parse_time(text: str) -> tuple[dtime | None, str]:
     Возвращает (time | None, текст без найденного времени).
     Для диапазона "с X до Y" берёт время начала, диапазон остаётся в описании.
     """
-    # 0. Диапазон "с 11 до 16" — берём время начала, текст не трогаем
+    # 0. Диапазон "с 11 до 16" — берём время начала, диапазон вырезаем из текста
     m = _RANGE_RE.search(text)
     if m:
         hour = int(m.group(1))
         minute = int(m.group(2)) if m.group(2) else 0
         if 0 <= hour <= 23 and 0 <= minute <= 59:
-            return dtime(hour, minute), text  # описание оставляем как есть
+            return dtime(hour, minute), _clean(_RANGE_RE.sub("", text, count=1))
 
     # 1. Период после числа: "11 утра", "в 5 вечера", "утром" и т.д.
     m = _PERIOD_AFTER_RE.search(text)
