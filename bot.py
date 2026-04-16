@@ -80,6 +80,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "  /stats — статистика за сегодня\n"
         "  /stats 7 — за последние 7 дней\n"
         "  /stats 01.04.2025 16.04.2025 — за период\n"
+        "  /export — скачать Excel за сегодня\n"
         "  /export 7 — скачать Excel за 7 дней\n"
         "  /export 01.04.2025 16.04.2025 — Excel за период\n"
         "  /delete — удалить последнюю запись\n"
@@ -186,7 +187,12 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     user_id = update.effective_user.id
 
     try:
-        if len(args) == 1:
+        if len(args) == 0:
+            today = str(date.today())
+            date_from, date_to = today, today
+            period_label = "сегодня"
+            filename = f"mood_{today}.xlsx"
+        elif len(args) == 1:
             days = int(args[0])
             date_from, date_to = _date_range_from_days(days)
             period_label = f"последние {days} дн."
@@ -201,6 +207,7 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     except (ValueError, IndexError):
         await update.message.reply_text(
             "Использование:\n"
+            "/export — сегодня\n"
             "/export 7\n"
             "/export 01.04.2025 16.04.2025"
         )
@@ -315,6 +322,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "  /stats — статистика за сегодня\n"
         "  /stats 7 — за последние 7 дней\n"
         "  /stats 01.04.2025 16.04.2025 — за период\n"
+        "  /export — скачать Excel за сегодня\n"
         "  /export 7 — скачать Excel за 7 дней\n"
         "  /export 01.04.2025 16.04.2025 — Excel за период\n"
         "  /delete — удалить последнюю запись\n"
