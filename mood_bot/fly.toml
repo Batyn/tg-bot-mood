@@ -3,6 +3,9 @@
 app = 'mood-bot'
 primary_region = 'ams'
 
+[env]
+  TZ = "Europe/Moscow"
+
 [build]
 
 [[mounts]]
