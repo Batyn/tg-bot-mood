@@ -1,24 +1,15 @@
 import io
-import re
 import sqlite3
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 
-_RANGE_RE = re.compile(
-    r"с\s+(\d{1,2})(?::(\d{2}))?\s+до\s+(\d{1,2})(?::(\d{2}))?",
-    re.IGNORECASE,
-)
-
-
-def _fmt_time_cell(created_at: str, description: str) -> str:
-    """Возвращает '11:00–16:00' если в описании есть диапазон, иначе 'HH:MM'."""
-    m = _RANGE_RE.search(description)
-    if m:
-        start_h, start_m = int(m.group(1)), int(m.group(2) or 0)
-        end_h, end_m = int(m.group(3)), int(m.group(4) or 0)
-        return f"{start_h:02d}:{start_m:02d}–{end_h:02d}:{end_m:02d}"
-    return created_at.split(" ")[1][:5]  # "HH:MM"
+def _fmt_time_cell(created_at: str, end_time: str | None) -> str:
+    """Возвращает '11:00–16:00' если есть end_time, иначе 'HH:MM'."""
+    start = created_at.split(" ")[1][:5]
+    if end_time:
+        return f"{start}–{end_time[:5]}"
+    return start
 
 
 def build_excel(rows: list[sqlite3.Row], total: int) -> io.BytesIO:
@@ -45,7 +36,7 @@ def build_excel(rows: list[sqlite3.Row], total: int) -> io.BytesIO:
     for row_idx, row in enumerate(rows, start=2):
         created_at: str = row["created_at"]
         date_part = created_at.split(" ")[0]
-        time_cell_value = _fmt_time_cell(created_at, row["description"])
+        time_cell_value = _fmt_time_cell(created_at, row["end_time"])
 
         ws.cell(row=row_idx, column=1, value=date_part)
         ws.cell(row=row_idx, column=2, value=time_cell_value)
