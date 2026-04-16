@@ -85,4 +85,6 @@ def build_abc_handler() -> ConversationHandler:
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
+        persistent=True,
+        name="abc_conversation",
     )

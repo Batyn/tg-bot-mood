@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -10,6 +11,7 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
     MessageHandler,
+    PicklePersistence,
     filters,
 )
 
@@ -431,7 +433,9 @@ def main() -> None:
     db.init_db()
     logger.info("База данных инициализирована.")
 
-    app = Application.builder().token(BOT_TOKEN).build()
+    persistence_path = Path(os.environ.get("DB_PATH", "/data/mood.db")).parent / "bot_state.pkl"
+    persistence = PicklePersistence(filepath=str(persistence_path))
+    app = Application.builder().token(BOT_TOKEN).persistence(persistence).build()
 
     # ConversationHandler должен быть до общего MessageHandler
     app.add_handler(build_abc_handler())
