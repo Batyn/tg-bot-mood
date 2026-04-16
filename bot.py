@@ -15,6 +15,7 @@ from telegram.ext import (
 
 import db
 import excel
+from excel import _fmt_time_cell
 from parser import parse_message
 
 load_dotenv()
@@ -111,10 +112,10 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"",
     ]
     for row in rows:
-        date_part, time_part = row["created_at"].split(" ")
-        time_short = time_part[:5]
+        date_part = row["created_at"].split(" ")[0]
+        time_str = _fmt_time_cell(row["created_at"], row["description"])
         score_str = f'"{_fmt_score(row["score"])}"'
-        lines.append(f"* {date_part}, {time_short}, {row['description']} {score_str}")
+        lines.append(f"* {date_part}, {time_str}, {row['description']} {score_str}")
 
     text = "\n".join(lines)
     if len(text) > 4096:
@@ -163,11 +164,10 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     # Текстовый список
     lines = []
     for row in rows:
-        created_at: str = row["created_at"]          # "2026-04-16 11:00:00"
-        date_part, time_part = created_at.split(" ")
-        time_short = time_part[:5]                    # "11:00"
+        date_part = row["created_at"].split(" ")[0]
+        time_str = _fmt_time_cell(row["created_at"], row["description"])
         score_str = f'"{_fmt_score(row["score"])}"'
-        lines.append(f"* {date_part}, {time_short}, {row['description']} {score_str}")
+        lines.append(f"* {date_part}, {time_str}, {row['description']} {score_str}")
 
     total = stats["total"]
     lines.append(f"\nИтого: {_fmt_score(total)}")
