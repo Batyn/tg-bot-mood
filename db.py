@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from datetime import date, time as dtime
+from datetime import date, datetime, time as dtime
 from pathlib import Path
 
 DB_PATH = Path(os.environ.get("DB_PATH", Path(__file__).parent / "mood.db"))
@@ -20,15 +20,16 @@ def init_db() -> None:
                 user_id     INTEGER NOT NULL,
                 created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
                 end_time    TEXT,
+                sent_at     TEXT,
                 score       INTEGER NOT NULL,
                 description TEXT    NOT NULL
             )
         """)
-        # Миграция: добавляем end_time если таблица уже существует без неё
-        try:
-            conn.execute("ALTER TABLE mood_logs ADD COLUMN end_time TEXT")
-        except sqlite3.OperationalError:
-            pass  # Колонка уже есть
+        for col in ("end_time TEXT", "sent_at TEXT"):
+            try:
+                conn.execute(f"ALTER TABLE mood_logs ADD COLUMN {col}")
+            except sqlite3.OperationalError:
+                pass
         conn.commit()
 
 
@@ -39,20 +40,16 @@ def insert_log(
     start_time: dtime | None = None,
     end_time: dtime | None = None,
 ) -> sqlite3.Row:
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # реальное время отправки
     created_at = (
         f"{date.today().isoformat()} {start_time.strftime('%H:%M:%S')}"
-        if start_time else None
+        if start_time else now
     )
     end_time_str = end_time.strftime("%H:%M:%S") if end_time else None
 
-    if created_at:
-        sql = """INSERT INTO mood_logs (user_id, created_at, end_time, score, description)
-                 VALUES (?, ?, ?, ?, ?)"""
-        params = (user_id, created_at, end_time_str, score, description)
-    else:
-        sql = """INSERT INTO mood_logs (user_id, end_time, score, description)
-                 VALUES (?, ?, ?, ?)"""
-        params = (user_id, end_time_str, score, description)
+    sql = """INSERT INTO mood_logs (user_id, created_at, end_time, sent_at, score, description)
+             VALUES (?, ?, ?, ?, ?, ?)"""
+    params = (user_id, created_at, end_time_str, now, score, description)
 
     with get_conn() as conn:
         conn.execute(sql, params)
@@ -72,7 +69,6 @@ def get_last_log(user_id: int) -> sqlite3.Row | None:
 
 
 def delete_last_log(user_id: int) -> sqlite3.Row | None:
-    """Удаляет последнюю запись пользователя. Возвращает удалённую строку или None."""
     with get_conn() as conn:
         row = conn.execute(
             "SELECT * FROM mood_logs WHERE user_id = ? ORDER BY id DESC LIMIT 1",
@@ -85,7 +81,6 @@ def delete_last_log(user_id: int) -> sqlite3.Row | None:
 
 
 def delete_user_logs(user_id: int) -> int:
-    """Удаляет все записи пользователя. Возвращает количество удалённых строк."""
     with get_conn() as conn:
         cur = conn.execute("DELETE FROM mood_logs WHERE user_id = ?", (user_id,))
         conn.commit()
@@ -112,7 +107,7 @@ def fetch_stats(user_id: int, date_from: str, date_to: str) -> dict:
 
 def fetch_rows(user_id: int, date_from: str, date_to: str) -> list[sqlite3.Row]:
     sql = """
-        SELECT created_at, end_time, score, description
+        SELECT created_at, end_time, sent_at, score, description
         FROM mood_logs
         WHERE user_id = ?
           AND created_at >= ?
