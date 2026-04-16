@@ -72,6 +72,14 @@ def fetch_stats(user_id: int, date_from: str, date_to: str) -> dict:
     return dict(row)
 
 
+def delete_user_logs(user_id: int) -> int:
+    """Удаляет все записи пользователя. Возвращает количество удалённых строк."""
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM mood_logs WHERE user_id = ?", (user_id,))
+        conn.commit()
+    return cur.rowcount
+
+
 def fetch_rows(user_id: int, date_from: str, date_to: str) -> list[sqlite3.Row]:
     sql = """
         SELECT created_at, score, description

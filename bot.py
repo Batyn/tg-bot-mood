@@ -3,9 +3,10 @@ import os
 from datetime import date, timedelta
 
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     MessageHandler,
@@ -186,6 +187,31 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     )
 
 
+async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("Да, удалить всё", callback_data="delete_confirm"),
+            InlineKeyboardButton("Отмена", callback_data="delete_cancel"),
+        ]
+    ])
+    await update.message.reply_text(
+        "⚠️ Удалить все твои записи? Это действие необратимо.",
+        reply_markup=keyboard,
+    )
+
+
+async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    user_id = update.effective_user.id
+
+    if query.data == "delete_confirm":
+        count = db.delete_user_logs(user_id)
+        await query.edit_message_text(f"Удалено записей: {count} 🗑")
+    else:
+        await query.edit_message_text("Отменено.")
+
+
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "📝 Как записывать настроение:\n"
@@ -206,6 +232,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "  /stats 2025-04-01 2025-04-16 — за период\n"
         "  /export 7 — скачать Excel за 7 дней\n"
         "  /export 2025-04-01 2025-04-16 — Excel за период\n"
+        "  /delete — удалить все свои записи\n"
         "  /help — эта справка"
     )
 
@@ -221,6 +248,8 @@ def main() -> None:
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("export", cmd_export))
+    app.add_handler(CommandHandler("delete", cmd_delete))
+    app.add_handler(CallbackQueryHandler(delete_callback, pattern="^delete_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("Бот запущен.")
