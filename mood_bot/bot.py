@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from datetime import date, datetime, timedelta
@@ -24,11 +25,48 @@ from parser import parse_message
 load_dotenv()
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 
+_CONFIG_PATH = Path(os.environ.get("DB_PATH", "/data/mood.db")).parent / "bot_config.json"
+
+def _get_config() -> dict:
+    if _CONFIG_PATH.exists():
+        return json.loads(_CONFIG_PATH.read_text())
+    return {}
+
+def _set_config(key: str, value: str) -> None:
+    cfg = _get_config()
+    cfg[key] = value
+    _CONFIG_PATH.write_text(json.dumps(cfg))
+
+def _get_emotions_photo_id() -> str | None:
+    return _get_config().get("emotions_photo_id")
+
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+
+_ABC_INFO_TEXT = (
+    "Режим: 📋 КПТ ABC\n\n"
+    "Метод КПТ помогает анализировать ситуации через три шага:\n"
+    "  A — Ситуация (что произошло)\n"
+    "  B — Мысли и убеждения\n"
+    "  C — Чувства и эмоции\n\n"
+    "После шага C можно добавить комментарий или пропустить его командой /skip.\n\n"
+    "📋 Команды:\n"
+    "  /abc — создать новую запись\n"
+    "  /cancel — отменить текущую запись\n"
+    "  /stats — список записей за сегодня\n"
+    "  /stats 7 — за последние 7 дней\n"
+    "  /stats 01.04.2025 16.04.2025 — за период\n"
+    "  /export — скачать Excel за сегодня\n"
+    "  /export 7 — скачать Excel за 7 дней\n"
+    "  /delete — удалить последнюю запись\n"
+    "  /deleteall — удалить все свои записи\n"
+    "  /timezone +3 — установить часовой пояс\n"
+    "  /mode — переключить режим\n"
+    "  /help — справка"
+)
 
 
 # ── Вспомогательные функции ────────────────────────────────────────────────
@@ -92,6 +130,27 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Выбери режим работы:",
         reply_markup=_MODE_KEYBOARD,
     )
+
+
+async def _send_abc_info(message) -> None:
+    """Отправляет информацию о КПТ ABC с картинкой эмоций (если загружена)."""
+    photo_id = _get_emotions_photo_id()
+    if photo_id:
+        await message.reply_photo(photo=photo_id, caption=_ABC_INFO_TEXT)
+    else:
+        await message.reply_text(_ABC_INFO_TEXT)
+
+
+async def cmd_setimage(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Ответ на фото с командой /setimage — сохраняет file_id картинки эмоций."""
+    if not update.message.photo:
+        await update.message.reply_text(
+            "Пришли картинку с подписью /setimage чтобы установить таблицу эмоций."
+        )
+        return
+    file_id = update.message.photo[-1].file_id
+    _set_config("emotions_photo_id", file_id)
+    await update.message.reply_text("Картинка с эмоциями сохранена ✅")
 
 
 async def cmd_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -166,27 +225,8 @@ async def mode_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
     elif query.data == "set_mode_abc":
         db.set_user_mode(user_id, "abc")
-        await query.edit_message_text(
-            "Режим: 📋 КПТ ABC\n\n"
-            "Метод КПТ помогает анализировать ситуации через три шага:\n"
-            "  A — Ситуация (что произошло)\n"
-            "  B — Мысли и убеждения\n"
-            "  C — Чувства и эмоции\n\n"
-            "После шага C можно добавить комментарий или пропустить его командой /skip.\n\n"
-            "📋 Команды:\n"
-            "  /abc — создать новую запись\n"
-            "  /cancel — отменить текущую запись\n"
-            "  /stats — список записей за сегодня\n"
-            "  /stats 7 — за последние 7 дней\n"
-            "  /stats 01.04.2025 16.04.2025 — за период\n"
-            "  /export — скачать Excel за сегодня\n"
-            "  /export 7 — скачать Excel за 7 дней\n"
-            "  /delete — удалить последнюю запись\n"
-            "  /deleteall — удалить все свои записи\n"
-            "  /timezone +3 — установить часовой пояс\n"
-            "  /mode — переключить режим\n"
-            "  /help — справка"
-        )
+        await query.edit_message_text("Режим: 📋 КПТ ABC")
+        await _send_abc_info(query.message)
 
 
 # ── Трекер настроения — ввод сообщения ───────────────────────────────────
@@ -457,26 +497,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "  /help — эта справка"
         )
     else:
-        await update.message.reply_text(
-            "📋 Режим: КПТ ABC\n\n"
-            "Метод КПТ помогает анализировать ситуации через три шага:\n"
-            "  A — Ситуация (что произошло)\n"
-            "  B — Мысли и убеждения\n"
-            "  C — Чувства и эмоции\n\n"
-            "Команды:\n"
-            "  /abc — создать новую запись\n"
-            "  /cancel — отменить текущую запись\n"
-            "  /stats — список записей за сегодня\n"
-            "  /stats 7 — за последние 7 дней\n"
-            "  /stats 01.04.2025 16.04.2025 — за период\n"
-            "  /export — скачать Excel за сегодня\n"
-            "  /export 7 — скачать Excel за 7 дней\n"
-            "  /export 01.04.2025 16.04.2025 — Excel за период\n"
-            "  /delete — удалить последнюю запись\n"
-            "  /deleteall — удалить все свои записи\n"
-            "  /mode — переключить режим\n"
-            "  /help — эта справка"
-        )
+        await _send_abc_info(update.message)
 
 
 # ── Запуск ────────────────────────────────────────────────────────────────
@@ -502,6 +523,7 @@ def main() -> None:
     app.add_handler(CommandHandler("deleteall", cmd_deleteall))
     app.add_handler(CallbackQueryHandler(mode_callback, pattern="^set_mode_"))
     app.add_handler(CallbackQueryHandler(delete_callback, pattern="^delete"))
+    app.add_handler(MessageHandler(filters.PHOTO, cmd_setimage))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("Бот запущен.")
