@@ -1,8 +1,24 @@
 import io
+import re
 import sqlite3
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
+
+_RANGE_RE = re.compile(
+    r"с\s+(\d{1,2})(?::(\d{2}))?\s+до\s+(\d{1,2})(?::(\d{2}))?",
+    re.IGNORECASE,
+)
+
+
+def _fmt_time_cell(created_at: str, description: str) -> str:
+    """Возвращает '11:00–16:00' если в описании есть диапазон, иначе 'HH:MM'."""
+    m = _RANGE_RE.search(description)
+    if m:
+        start_h, start_m = int(m.group(1)), int(m.group(2) or 0)
+        end_h, end_m = int(m.group(3)), int(m.group(4) or 0)
+        return f"{start_h:02d}:{start_m:02d}–{end_h:02d}:{end_m:02d}"
+    return created_at.split(" ")[1][:5]  # "HH:MM"
 
 
 def build_excel(rows: list[sqlite3.Row], total: int) -> io.BytesIO:
@@ -27,11 +43,12 @@ def build_excel(rows: list[sqlite3.Row], total: int) -> io.BytesIO:
 
     # ── Данные ─────────────────────────────────────────────────
     for row_idx, row in enumerate(rows, start=2):
-        created_at: str = row["created_at"]   # "2025-04-16 14:30:00"
-        date_part, time_part = created_at.split(" ")
+        created_at: str = row["created_at"]
+        date_part = created_at.split(" ")[0]
+        time_cell_value = _fmt_time_cell(created_at, row["description"])
 
         ws.cell(row=row_idx, column=1, value=date_part)
-        ws.cell(row=row_idx, column=2, value=time_part)
+        ws.cell(row=row_idx, column=2, value=time_cell_value)
         ws.cell(row=row_idx, column=3, value=row["description"])
         score_cell = ws.cell(row=row_idx, column=4, value=row["score"])
         score_cell.alignment = Alignment(horizontal="center")
@@ -50,7 +67,7 @@ def build_excel(rows: list[sqlite3.Row], total: int) -> io.BytesIO:
     total_cell.alignment = Alignment(horizontal="center")
 
     # ── Ширина колонок ─────────────────────────────────────────
-    widths = [12, 10, 40, 8]
+    widths = [12, 14, 40, 8]
     for col, width in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(col)].width = width
 
