@@ -55,9 +55,11 @@ def build_excel(rows: list[sqlite3.Row], total: int) -> io.BytesIO:
 
         # Цветовая индикация оценки
         if row["score"] > 0:
-            score_cell.font = Font(color="375623")
+            score_cell.font = Font(color="375623", bold=True)  # зелёный
         elif row["score"] < 0:
-            score_cell.font = Font(color="9C0006")
+            score_cell.font = Font(color="9C0006", bold=True)  # красный
+        else:
+            score_cell.font = Font(color="0070C0", bold=True)  # синий
 
     # ── Итоговая строка ────────────────────────────────────────
     total_row = len(rows) + 2

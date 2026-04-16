@@ -39,6 +39,14 @@ def _fmt_score(score: int) -> str:
     return f"+{score}" if score > 0 else str(score)
 
 
+def _score_dot(score: int) -> str:
+    if score > 0:
+        return "🟢"
+    if score < 0:
+        return "🔴"
+    return "🔵"
+
+
 # ── Обработчики команд ────────────────────────────────────────────────────
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -58,7 +66,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     created_at: str = row["created_at"]  # "2025-04-16 14:30:00"
     time_note = " (время из сообщения)" if custom_time is not None else ""
     await update.message.reply_text(
-        f"Записала ✅  {created_at}{time_note}  {_fmt_score(score)}  {description}"
+        f"Записала ✅  {created_at}{time_note}  {_score_dot(score)} {_fmt_score(score)}  {description}"
     )
 
 
@@ -114,7 +122,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     for row in rows:
         date_part = row["created_at"].split(" ")[0]
         time_str = _fmt_time_cell(row["created_at"], row["description"])
-        score_str = f'"{_fmt_score(row["score"])}"'
+        score_str = f'{_score_dot(row["score"])} "{_fmt_score(row["score"])}"'
         lines.append(f"* {date_part}, {time_str}, {row['description']} {score_str}")
 
     text = "\n".join(lines)
@@ -166,7 +174,7 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     for row in rows:
         date_part = row["created_at"].split(" ")[0]
         time_str = _fmt_time_cell(row["created_at"], row["description"])
-        score_str = f'"{_fmt_score(row["score"])}"'
+        score_str = f'{_score_dot(row["score"])} "{_fmt_score(row["score"])}"'
         lines.append(f"* {date_part}, {time_str}, {row['description']} {score_str}")
 
     total = stats["total"]
