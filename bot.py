@@ -59,6 +59,36 @@ def _score_dot(score: int) -> str:
 
 # ── Обработчики команд ────────────────────────────────────────────────────
 
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    name = update.effective_user.first_name or "друг"
+    await update.message.reply_text(
+        f"Привет, {name}! 👋\n\n"
+        "Я помогаю отслеживать настроение и самочувствие.\n"
+        "Просто пиши что происходит и ставь оценку — я сохраню всё в дневник.\n\n"
+        "📝 Как записывать:\n"
+        "Напиши сообщение с оценкой от -10 до +10 (со знаком + или -).\n"
+        "Оценка может быть в любом месте текста.\n\n"
+        "Примеры:\n"
+        "  проснулась с мыслями о нём, +5\n"
+        "  -8 ссора с мужем\n"
+        "  хороший завтрак +3\n\n"
+        "🕐 Можно указать время:\n"
+        "  11 утра хороший кофе +4\n"
+        "  в 5 вечера прогулка +7\n"
+        "  11-15 работал +3\n\n"
+        "📊 Команды:\n"
+        "  /stats — статистика за сегодня\n"
+        "  /stats 7 — за последние 7 дней\n"
+        "  /stats 01.04.2025 16.04.2025 — за период\n"
+        "  /export 7 — скачать Excel за 7 дней\n"
+        "  /export 01.04.2025 16.04.2025 — Excel за период\n"
+        "  /delete — удалить последнюю запись\n"
+        "  /deleteall — удалить все свои записи\n"
+        "  /help — эта справка\n\n"
+        "Начинай писать! 🙂"
+    )
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = update.message.text or ""
     user_id = update.effective_user.id
@@ -301,6 +331,7 @@ def main() -> None:
 
     app = Application.builder().token(BOT_TOKEN).build()
 
+    app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("export", cmd_export))
