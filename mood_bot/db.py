@@ -47,12 +47,17 @@ def init_db() -> None:
                 timezone_offset  INTEGER NOT NULL DEFAULT 3
             )
         """)
-        # Миграции
-        for col in ("end_time TEXT", "sent_at TEXT", "timezone_offset INTEGER NOT NULL DEFAULT 3"):
+        # Миграции mood_logs
+        for col in ("end_time TEXT", "sent_at TEXT"):
             try:
                 conn.execute(f"ALTER TABLE mood_logs ADD COLUMN {col}")
             except sqlite3.OperationalError:
                 pass
+        # Миграции user_settings
+        try:
+            conn.execute("ALTER TABLE user_settings ADD COLUMN timezone_offset INTEGER NOT NULL DEFAULT 3")
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
 
 
