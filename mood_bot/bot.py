@@ -474,6 +474,16 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await _send_abc_info(update.message)
 
 
+# ── Обработчик ошибок ────────────────────────────────────────────────────
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.error("Ошибка при обработке обновления:", exc_info=context.error)
+    if isinstance(update, Update) and update.effective_message:
+        await update.effective_message.reply_text(
+            "Произошла ошибка. Попробуй ещё раз или начни заново с /abc."
+        )
+
+
 # ── Запуск ────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -499,6 +509,8 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(delete_callback, pattern="^delete"))
     app.add_handler(MessageHandler(filters.PHOTO, cmd_setimage))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    app.add_error_handler(error_handler)
 
     logger.info("Бот запущен.")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

@@ -54,13 +54,28 @@ async def skip_comment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 async def _save(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
+    situation = context.user_data.get("abc_situation")
+    thoughts  = context.user_data.get("abc_thoughts")
+    feelings  = context.user_data.get("abc_feelings")
+    comment   = context.user_data.get("abc_comment")
+
+    if not situation or not thoughts or not feelings:
+        await update.message.reply_text(
+            "Что-то пошло не так — данные потерялись. Начни заново с /abc."
+        )
+        context.user_data.clear()
+        return ConversationHandler.END
+
     db.insert_abc_log(
         user_id=user_id,
-        situation=context.user_data.pop("abc_situation"),
-        thoughts=context.user_data.pop("abc_thoughts"),
-        feelings=context.user_data.pop("abc_feelings"),
-        comment=context.user_data.pop("abc_comment", None),
+        situation=situation,
+        thoughts=thoughts,
+        feelings=feelings,
+        comment=comment,
     )
+    for key in ("abc_situation", "abc_thoughts", "abc_feelings", "abc_comment"):
+        context.user_data.pop(key, None)
+
     today = date.today().strftime("%d.%m.%Y")
     await update.message.reply_text(f"✅  ABC-запись сохранена  {today}")
     return ConversationHandler.END
